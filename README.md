@@ -70,7 +70,9 @@ Một số case không cung cấp exact order ID. Agent phải dùng candidate v
 
 ## 4. Sử dụng MCP
 
-MCP Gateway cung cấp evidence về order, customer, product, shipment, payment, refund và policy. Mọi call đều được server audit theo team và case.
+MCP Gateway cung cấp evidence về order, customer, product, shipment, payment, refund và policy. Mọi call đều được server audit theo team, active run và case.
+
+Chạy `day09 start-run` để mở run trước khi thu thập evidence cho submission mới. Sau khi nộp submission, cần mở run mới trước lần thu thập tiếp theo. Lệnh này lưu thông tin run tại `traces/active-run.json`.
 
 Xem các tool hiện có:
 
@@ -108,7 +110,7 @@ Quy tắc quan trọng:
 - luôn truyền đúng `case_id`;
 - dùng tool discovery, không đoán tên tool;
 - không sửa hoặc tự tạo `evidence_ref`;
-- không dùng evidence chéo case;
+- không dùng evidence chéo team, run hoặc case;
 - giới hạn retry, cache trong phạm vi case và tránh gọi tool thừa.
 
 Tất cả MCP calls đều được audit và có thể ảnh hưởng điểm efficiency, kể cả call không được đưa vào output.
@@ -142,14 +144,25 @@ Competition không chấm tên framework hay số lượng class. Scorer đánh 
 
 Trace chỉ ghi sự kiện quan sát được như `task_assigned`, `handoff`, `tool_result_consumed`, `verification_completed`.
 
-Hoàn thiện mô tả thiết kế trong `ARCHITECTURE.md`.
+Workflow hiện tại lấy customer history để chọn bản ghi mua hàng phù hợp với `opened_at`, rồi đối chiếu item, payment, refund và shipment trong cùng giai đoạn. Bản gốc MCP và `evidence_ref` được giữ nguyên; các nguồn khác nhau được ghi vào `data_conflicts`, và output trích dẫn evidence dùng cho kết luận. Xem chi tiết tại `ARCHITECTURE.md`.
 
 ## 6. Chạy và kiểm tra
 
 ```bash
-day09 run
+day09 start-run
+day09 run --jobs 1
 day09 validate
 ```
+
+`--jobs` cho phép chạy đồng thời 1–4 case, mặc định là 1. Các bước trong mỗi case vẫn chạy theo thứ tự. Toàn bộ 100 output và trace được tạo trong thư mục tạm, kiểm tra xong mới thay thế kết quả hiện tại. Nếu batch thất bại vì gateway hoặc thiếu evidence bắt buộc, output và trace trước đó được giữ lại; ZIP hiện có chỉ thay đổi khi chạy `package` thành công.
+
+Có thể thay lệnh `run` bằng lệnh sau để lưu và dùng lại response trong **cùng active run**:
+
+```bash
+day09 run --jobs 2 --evidence-cache traces/evidence-run-01.jsonl
+```
+
+Cache là tùy chọn và nằm ngoài ZIP submission. Cache kiểm tra schema, giữ nguyên evidence ref và phân biệt case/tool/arguments. Lỗi tạm thời hoặc lỗi không rõ nguyên nhân vẫn được gọi lại, không được xem là evidence thành công. **Không dùng lại cache sau khi mở run mới hoặc nộp submission:** chọn tên file cache mới, vì scorer kiểm tra provenance theo run. Cache không tự xác minh run phía server.
 
 Kết quả được tạo tại:
 
